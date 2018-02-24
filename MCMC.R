@@ -77,6 +77,7 @@ acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
     cond.prob.proposal <- exp(rowSums(log(P.proposal) * X + log(1 - P.proposal)*(1 - X)))
   }
   ratio <- cond.prob.proposal*theta.prior(val = proposal)/(cond.prob.current*b.prior(val = chain.beta))
+  if ((length(ratio[is.nan(ratio)])) == 0) print(ratio)
   return(pmin(ratio, rep(1,n)))
 }
 
