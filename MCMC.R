@@ -63,21 +63,19 @@ prop.beta <- function(current){
 
 acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
   P <- outer(chain.beta, chain.theta, probability)
-  nitems <- length(chain.beta)
-  npersons <- length(chain.theta)
   if (mode == 0) {
     n <- npersons
     P.proposal <- outer(chain.beta, proposal, probability)
     cond.prob.current <- exp(colSums(log(P) * X + log(1 - P)*(1 - X)))
     cond.prob.proposal <- exp(colSums(log(P.proposal) * X + log(1 - P.proposal)*(1 - X)))
+    ratio <- cond.prob.proposal*theta.prior(val = proposal)/(cond.prob.current*b.prior(val = chain.beta))
   } else {
     n <- nitems
     P.proposal <- outer(proposal, chain.theta, probability)
     cond.prob.current <- exp(rowSums(log(P) * X + log(1 - P)*(1 - X)))
     cond.prob.proposal <- exp(rowSums(log(P.proposal) * X + log(1 - P.proposal)*(1 - X)))
+    ratio <- cond.prob.proposal*b.prior(val = proposal)/(cond.prob.current*b.prior(val = chain.beta))
   }
-  ratio <- cond.prob.proposal*theta.prior(val = proposal)/(cond.prob.current*b.prior(val = chain.beta))
-  if ((length(ratio[is.nan(ratio)])) == 0) print(ratio)
   return(pmin(ratio, rep(1,n)))
 }
 
@@ -93,19 +91,30 @@ rasch.gs <- function(startvalue.theta, startvalue.beta, iterations, data, nitems
   for (i in 2:iterations) {
     t.proposal <- prop.theta(chain.theta[i - 1,]) # sample a new value for theta
     b.proposal <- prop.beta(chain.beta[i - 1,])
-    chain.theta[i,] <- ifelse(acceptance(t.proposal, chain.theta[i - 1,], chain.beta[i - 1,], X, 0) < runif(1), 
-           t.proposal,
-           chain.theta[i - 1,])
-    chain.beta[i,] <- ifelse(acceptance(b.proposal, chain.theta[i - 1,], chain.beta[i - 1,], X, 1) < runif(1),
-           b.proposal,
-           chain.beta[i - 1,])
-  }
+    acceptance.theta <- acceptance(t.proposal, chain.theta[i - 1,], chain.beta[i - 1,], X, 0)
+    acceptance.beta <- acceptance(b.proposal, chain.theta[i - 1,], chain.beta[i - 1,], X, 1)
+    chain.theta[i,] <- ifelse(acceptance.theta == rep(1, length(acceptance.theta)), 
+                              t.proposal,
+                              chain.theta[i - 1,])
+    chain.beta[i,] <- ifelse(acceptance.beta == rep(1, length(acceptance.beta)),
+                             b.proposal,
+                             chain.beta[i - 1,])
+    chain.theta[i,] <- ifelse(acceptance.theta < runif(length(acceptance.theta), 0, 1), 
+                              t.proposal,
+                              chain.theta[i - 1,])
+    chain.beta[i,] <- ifelse(acceptance.beta < runif(length(acceptance.beta), 0, 1),
+                             b.proposal,
+                             chain.beta[i - 1,])
+    #print(b.proposal)
+    #print(chain.beta[i,])
+    #stopifnot(is.finite(t.proposal))
+    #  }
   list <- list("chain.theta" = mcmc(chain.theta), "chain.beta" = mcmc(chain.beta))
   return(list)
 }
 
-startvalue.theta <- rep(0.1, npersons)
-startvalue.beta <- rep(0.1, nitems)
+startvalue.theta <- rep(5.91085184, npersons)
+startvalue.beta <- rep(0.18186737, nitems)
 iterations <- 5000
 
 mc <- rasch.gs(startvalue.theta, startvalue.beta, iterations, X, nitems, npersons)
