@@ -58,6 +58,12 @@ prop.theta <- function(current){
 
 prop.beta <- function(current){
   proposal <- rnorm(current, mean = current, sd = 1)
+  print("Next")
+  print("current state")
+  print(current)
+  print("proposal state")
+  print(proposal)
+  stopifnot(is.finite(proposal))
   return(proposal)
 }
 
@@ -91,24 +97,31 @@ rasch.gs <- function(startvalue.theta, startvalue.beta, iterations, data, nitems
   for (i in 2:iterations) {
     t.proposal <- prop.theta(chain.theta[i - 1,]) # sample a new value for theta
     b.proposal <- prop.beta(chain.beta[i - 1,])
+    print("chain beta i-1")
+    print(chain.beta[i - 1,])
     acceptance.theta <- acceptance(t.proposal, chain.theta[i - 1,], chain.beta[i - 1,], X, 0)
-    acceptance.beta <- acceptance(b.proposal, chain.theta[i - 1,], chain.beta[i - 1,], X, 1)
+    print("acceptance theta")
+    print(acceptance.theta)
     chain.theta[i,] <- ifelse(acceptance.theta == rep(1, length(acceptance.theta)), 
                               t.proposal,
                               chain.theta[i - 1,])
-    chain.beta[i,] <- ifelse(acceptance.beta == rep(1, length(acceptance.beta)),
-                             b.proposal,
-                             chain.beta[i - 1,])
     chain.theta[i,] <- ifelse(acceptance.theta < runif(length(acceptance.theta), 0, 1), 
                               t.proposal,
                               chain.theta[i - 1,])
+    acceptance.beta <- acceptance(b.proposal, chain.theta[i,], chain.beta[i - 1,], X, 1)
+    print("acceptance beta")
+    print(acceptance.beta)
+    chain.beta[i,] <- ifelse(acceptance.beta == rep(1, length(acceptance.beta)),
+                             b.proposal,
+                             chain.beta[i - 1,])
     chain.beta[i,] <- ifelse(acceptance.beta < runif(length(acceptance.beta), 0, 1),
                              b.proposal,
                              chain.beta[i - 1,])
     #print(b.proposal)
-    #print(chain.beta[i,])
+    print("chain i")
+    print(chain.beta[i,])
     #stopifnot(is.finite(t.proposal))
-    #  }
+      }
   list <- list("chain.theta" = mcmc(chain.theta), "chain.beta" = mcmc(chain.beta))
   return(list)
 }
