@@ -2,44 +2,33 @@ library(ggplot2)
 library(MCMCpack)
 set.seed(62)
 #DATA SIMULATION
-rasch.modeling <- function(persons, items) {
-  temp <- matrix(rep(items, length(persons)), ncol = length(persons))
-  exp_index <- t(apply(temp, 1, '-', persons))
-  probabilities <- 1 / (1 + exp(exp_index))
-  output <- list()
-  output$items <- items
-  output$persons <- persons
-  output$data <- matrix(apply(probabilities, 1, function(x) as.numeric(runif(1) > x)), ncol = length(persons))
-  output
+sim.rasch <- function(persons, items, cutpoint = "randomized"){
+  schwierig <- items
+  n.items <- length(items)
+  faehig <- persons
+  n.persons <- length(persons)
+  fsmat <- outer(faehig, schwierig, "-")
+  psolve <- exp(fsmat)/(1 + exp(fsmat))
+  R <- (matrix(runif(n.items*n.persons),n.persons,n.items) < psolve)*1
+  R
 }
 npersons <- 100
 nitems <- 20
 items <- rnorm(nitems, 0, 1)
 persons <- rnorm(npersons)
-rmdata <- rasch.modeling(persons, items)
-X <- rmdata$data
+rmdata <- sim.rasch(persons, items)
+X <- t(rmdata)
 
 probability <- function(beta, theta) {
   return(1 / (1 + exp(beta - theta)))
 }
 
-# loglikelihood of the data
-data.like <- function(param, data){
-  theta <- param[1] # person ability
-  b <- param[2] # item difficulty
-  p <- exp(theta - b)/(1 + exp(theta - b))
-  y <- data # data
-  # log likelihood
-  like <- sum(y*log(p) + (1 - y)*log(1 - p)) 
-  return(like)
-}
-
 theta.prior <- function(mean = 0, sd = 1, val){
-  mu <- mean # prior mean
-  s <- sd # prior standard deviation
-  y <- val # observed "x" value from prior
+  mu <- mean 
+  s <- sd 
+  y <- val
   prior <- dnorm(x = y, mean = mu, sd = s) 
-  return(prior)
+  prior
 }
 
 b.prior <- function(mean = 0, sd = 1, val){
@@ -47,13 +36,13 @@ b.prior <- function(mean = 0, sd = 1, val){
   s <- sd
   y <- val
   prior <- dnorm(x = y, mean = mu, sd = s)
-  return(prior)
+  prior
 } 
 
 # proposal, centered around the current value of the chain
 prop.theta <- function(current){
   proposal <- rnorm(current, mean = current, sd = 1)
-  return(proposal)
+  proposal
 }
 
 prop.beta <- function(current){
@@ -128,21 +117,19 @@ rasch.gs <- function(startvalue.theta, startvalue.beta, iterations, data, nitems
   return(list)
 }
 
-startvalue.theta <- rep(5.91085184, npersons)
-startvalue.beta <- rep(0.18186737, nitems)
-iterations <- 5000
+startvalue.theta <- rep(0.1, npersons)
+startvalue.beta <- rep(0.1, nitems)
+iterations <- 50000
 
 mc <- rasch.gs(startvalue.theta, startvalue.beta, iterations, X, nitems, npersons)
-
-par(mfrow = c(1,1))
 burnIn <- 2500
-hist(mc$chain.theta[, 1],nclass = 30, main = "Posterior of theta_1")
-abline(v = mean(mc$chain.theta[,1]), col = "red")
+hist(mc$chain.theta[burnIn:iterations - 1, 1],nclass = 30, main = "Posterior of theta_1")
+abline(v = mean(mc$chain.theta[burnIn:iterations - 1,1]), col = "red")
 hist(mc$chain.beta[,1],nclass = 30, main = "Posterior of beta_1")
-abline(v = mean(mc$chain.beta[,1]), col = "red")
-plot(as.vector(mc$chain.theta[,1]), type = "l", main = "Chain values of theta_1" )
-plot(as.vector(mc$chain.beta[,1]), type = "l",  main = "Chain values of beta_1" )
-print(mc$chain.theta[1:burnIn, 1])
-print(mc$chain.beta[1:burnIn, 1])
-fitdistr(mc$chain.theta[burnIn,], "normal")
-fitdistr(mc$chain.beta[burnIn,], "normal")
+abline(v = mean(mc$chain.beta[burnIn:iterations - 1,1]), col = "red")
+plot(as.vector(mc$chain.theta[burnIn:iterations - 1,1]), type = "l", main = "Chain values of theta_1" )
+plot(as.vector(mc$chain.beta[burnIn:iterations - 1,1]), type = "l",  main = "Chain values of beta_1" )
+fitdistr(mc$chain.theta[burnIn:iterations - 1,], "normal")
+fitdistr(mc$chain.beta[burnIn:iterations - 1,], "normal")
+autocorr(mcmc(mc$chain.beta[1:iterations - 1,1]), lags <- c(0, 10000, 20000, 30000, 40000, 49000))
+autocorr(mcmc(mc$chain.theta[1:iterations - 1,1]), lags <- c(0, 10000, 20000, 30000, 40000, 49000))
