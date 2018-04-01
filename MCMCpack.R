@@ -18,11 +18,7 @@ items <- rnorm(nitems, 0, 2)
 persons <- rnorm(npersons)
 rmdata <- sim.rasch(persons, items)
 
-mc1 <- MCMCirt1d(rmdata, beta.start = 1, b0.beta = 1, B0.beta = 0, ab0 = c(0, 0), AB0 = c(1, 0), store.item = TRUE)
+mc1 <- MCMCirt1d(rmdata, store.item = TRUE)
 summary(mc1)
-#autocorr(mc1)
-
-mc2 <- MCMCirt1d(rmdata, beta.start = 1, b0.beta = 1, B0.beta = 0, store.item = TRUE)
-summary(mc2)
-#autocorr(mc2)
-
+thetas <- as.matrix(mc1[,1:npersons])
+betas <- as.matrix(mc1[,-(1:npersons)])
