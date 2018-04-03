@@ -44,6 +44,7 @@ b.prior <- function(mean = 0, sd = 1, val){
 # proposal, centered around the current value of the chain
 prop.theta <- function(current){
   proposal <- rnorm(current, mean = current, sd = 1)
+
   proposal
 }
 
@@ -57,15 +58,19 @@ acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
   if (mode == 0) {
     n <- npersons
     P.proposal <- outer(chain.beta, proposal, probability)
-    cond.prob.current <- exp(colSums(log(P) * X + log(1 - P)*(1 - X)))
-    cond.prob.proposal <- exp(colSums(log1p(P.proposal) * (1 - X) + log(1 - P.proposal)*(1 - X)))
-    ratio <- cond.prob.proposal*theta.prior(val = proposal)/(cond.prob.current*b.prior(val = chain.beta))
+    cond.prob.current <- (colSums(log(P) * X + log(1 - P)*(1 - X)))
+    cond.prob.proposal <- (colSums(log(P.proposal) * (1 - X) + log(1 - P.proposal)*(1 - X)))
+    ratio <- exp(cond.prob.proposal + log(theta.prior(val = proposal)) -
+                        (cond.prob.current + log(theta.prior(val = chain.theta))))
+    stopifnot(!any(is.na(ratio)))
+    
   } else {
     n <- nitems
     P.proposal <- outer(proposal, chain.theta, probability)
     cond.prob.current <- exp(rowSums(log(P) * X + log(1 - P)*(1 - X)))
     cond.prob.proposal <- exp(rowSums(log(P.proposal) * X + log(1 - P.proposal)*(1 - X)))
-    ratio <- cond.prob.proposal*b.prior(val = proposal)/(cond.prob.current*b.prior(val = chain.beta))
+    ratio <- cond.prob.proposal*b.prior(val = proposal) /
+                        (cond.prob.current*b.prior(val = chain.beta))
   }
   return(pmin(ratio, rep(1,n)))
 }
@@ -100,6 +105,17 @@ rasch.gs <- function(startvalue.theta, startvalue.beta, iterations, data, nitems
 
 startvalue.theta <- rep(0.1, npersons)
 startvalue.beta <- rep(0.1, nitems)
-iterations <- 5000
+iterations <- 10000
 
 mc <- rasch.gs(startvalue.theta, startvalue.beta, iterations, X, nitems, npersons)
+fitdistr(mc$chain.theta[iterations,], "normal")
+fitdistr(mc$chain.beta[iterations,], "normal")
+hist(mc$chain.theta[, 1],nclass = 30, main = "Posterior of theta_1")
+abline(v = mean(mc$chain.theta[,1]), col = "red")
+hist(mc$chain.beta[,1],nclass = 30, main = "Posterior of beta_1")
+abline(v = mean(mc$chain.beta[,1]), col = "red")
+plot(as.vector(mc$chain.theta[,1]), type = "l", main = "Chain values of theta_1" )
+plot(as.vector(mc$chain.beta[,1]), type = "l",  main = "Chain values of beta_1" )
+hist(mc$chain.theta[, 50],nclass = 30, main = "Posterior of theta_50")
+abline(v = mean(mc$chain.theta[,50]), col = "red")
+plot(as.vector(mc$chain.theta[,50]), type = "l", main = "Chain values of theta_50" )
