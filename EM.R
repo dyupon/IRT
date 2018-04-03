@@ -2,15 +2,13 @@ library(ggplot2)
 set.seed(62)
 
 #DATA SIMULATION
-rasch.modeling <- function(persons, items) {
-  temp <- matrix(rep(items, length(persons)), ncol = length(persons))
-  exp_index <- t(apply(temp, 1, '-', persons))
-  probabilities <- 1 / (1 + exp(exp_index))
-  output <- list()
-  output$items <- items
-  output$persons <- persons
-  output$data <- matrix(apply(probabilities, 1, function(x) as.numeric(runif(1) > x)), ncol = length(persons))
-  output
+rasch.modelling <- function(persons, items) {
+  n.items <- length(items)
+  n.persons <- length(persons)
+  fsmat <- outer(persons, items, "-")
+  psolve <- exp(fsmat)/(1 + exp(fsmat))
+  R <- (matrix(runif(n.items*n.persons),n.persons,n.items) < psolve)*1
+  R
 }
 
 npersons <- 100
@@ -24,8 +22,8 @@ sampleDist = function(n) {
 
 persons <- sampleDist(npersons)
 items <- rnorm(nitems)
-rmdata <- rasch.modeling(persons, items)
-Y <- rmdata$data
+rmdata <- rasch.modelling(persons, items)
+Y <- t(rmdata)
 
 
 #APPROXIMATIONS
@@ -87,17 +85,16 @@ while (abs(old.likelihood - new.likelihood) > eps) {
   betas.s <- opt$par
   old.likelihood <- new.likelihood
   new.likelihood <- opt$value
-  if (iter_count %% 10 == 0) {
+  # if (iter_count %% 10 == 0) {
     print("iteration")
     print(iter_count)
     print(betas.s)
     print(thetas.s)
     print(new.likelihood)
-  }
+  #}
 }
 ggplot(as.data.frame(betas.s), aes(betas.s)) + stat_ecdf(geom = "step")
-ggplot(as.data.frame(rmdata$items), aes(rmdata$items)) + stat_ecdf(geom = "step")
 ggplot(as.data.frame(thetas.s), aes(thetas.s)) + stat_ecdf(geom = "step")
-ggplot(as.data.frame(rmdata$persons), aes(rmdata$persons)) + stat_ecdf(geom = "step")
 ggplot(as.data.frame(betas.s), aes(betas.s)) + geom_density()
-ggplot(as.data.frame(rmdata$items), aes(rmdata$items)) + geom_density()
+ggplot(as.data.frame(thetas.s), aes(thetas.s)) + geom_density()
+
