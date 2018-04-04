@@ -4,11 +4,9 @@ library(matrixStats)
 set.seed(62)
 
 sim.rasch <- function(persons, items){
-  schwierig <- items
   n.items <- length(items)
-  faehig <- persons
   n.persons <- length(persons)
-  fsmat <- outer(faehig, schwierig, "-")
+  fsmat <- outer(persons, items, "-")
   psolve <- exp(fsmat)/(1 + exp(fsmat))
   R <- (matrix(runif(n.items*n.persons),n.persons,n.items) < psolve)*1
   R
@@ -26,53 +24,46 @@ probability <- function(beta, theta) {
 }
 
 theta.prior <- function(mean = 0, sd = 1, val){
-  mu <- mean 
-  s <- sd 
-  y <- val
-  prior <- dnorm(x = y, mean = mu, sd = s) 
-  prior
+  dnorm(x = val, mean, sd, log = T) 
 }
 
 b.prior <- function(mean = 0, sd = 1, val){
-  mu <- mean
-  s <- sd
-  y <- val
-  prior <- dnorm(x = y, mean = mu, sd = s)
-  prior
+  dnorm(x = val, mean, sd, log = T)
 } 
 
-# proposal, centered around the current value of the chain
 prop.theta <- function(current){
-  proposal <- rnorm(current, mean = current, sd = 1)
-
-  proposal
+  rnorm(n = current, current, sd = 1)
 }
 
 prop.beta <- function(current){
-  proposal <- rnorm(current, mean = current, sd = 1)
-  return(proposal)
+  rnorm(n = current, current, sd = 1)
 }
 
 acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
   P <- outer(chain.beta, chain.theta, probability)
+  diff <- outer(chain.beta, chain.theta, function(x, y) {x - y})
+  lgP <- log(P)
   if (mode == 0) {
     n <- npersons
     P.proposal <- outer(chain.beta, proposal, probability)
-    cond.prob.current <- (colSums(log(P) * X + log(1 - P)*(1 - X)))
-    cond.prob.proposal <- (colSums(log(P.proposal) * (1 - X) + log(1 - P.proposal)*(1 - X)))
-    ratio <- exp(cond.prob.proposal + log(theta.prior(val = proposal)) -
-                        (cond.prob.current + log(theta.prior(val = chain.theta))))
+    diff.proposal <- outer(chain.beta, proposal, function(x, y) {x - y})
+    lgP.proposal <- log(P.proposal)
+    cond.prob.current <- colSums(lgP * X + (diff + lgP)*(1 - X))
+    cond.prob.proposal <- colSums(lgP.proposal * (1 - X) + (diff.proposal + lgP.proposal)*(1 - X))
+    ratio <- cond.prob.proposal + theta.prior(val = proposal) - 
+                   (cond.prob.current + b.prior(val = chain.beta))
     stopifnot(!any(is.na(ratio)))
-    
   } else {
     n <- nitems
     P.proposal <- outer(proposal, chain.theta, probability)
-    cond.prob.current <- exp(rowSums(log(P) * X + log(1 - P)*(1 - X)))
-    cond.prob.proposal <- exp(rowSums(log(P.proposal) * X + log(1 - P.proposal)*(1 - X)))
-    ratio <- cond.prob.proposal*b.prior(val = proposal) /
-                        (cond.prob.current*b.prior(val = chain.beta))
+    diff.proposal <- outer(proposal, chain.theta, function(x, y) {x - y})
+    lgP.proposal <- log(P.proposal)
+    cond.prob.current <- rowSums(lgP * X + (diff + lgP)*(1 - X))
+    cond.prob.proposal <- rowSums(lgP.proposal * (1 - X) + (diff.proposal + lgP.proposal)*(1 - X))
+    ratio <- cond.prob.proposal + b.prior(val = proposal) -
+      (cond.prob.current + b.prior(val = chain.beta))
   }
-  return(pmin(ratio, rep(1,n)))
+  return(pmin(ratio, rep(0,n)))
 }
 
 
@@ -89,13 +80,13 @@ rasch.gs <- function(startvalue.theta, startvalue.beta, iterations, data, nitems
     acceptance.theta <- acceptance(t.proposal, chain.theta[i - 1,], 
                                    chain.beta[i - 1,], X, 
                                    0)
-    chain.theta[i,] <- ifelse(runif(length(acceptance.theta), 0, 1) < acceptance.theta, 
+    chain.theta[i,] <- ifelse(-rexp(n = length(acceptance.theta), 1) < acceptance.theta, 
                               t.proposal,
                               chain.theta[i - 1,])
     acceptance.beta <- acceptance(b.proposal, chain.theta[i,], 
                                   chain.beta[i - 1,], X, 
                                   1)
-    chain.beta[i,] <- ifelse(runif(length(acceptance.beta), 0, 1) < acceptance.beta,
+    chain.beta[i,] <- ifelse(-rexp(n = length(acceptance.beta), 1) < acceptance.beta,
                              b.proposal,
                              chain.beta[i - 1,])
   }
@@ -103,8 +94,8 @@ rasch.gs <- function(startvalue.theta, startvalue.beta, iterations, data, nitems
   return(list)
 }
 
-startvalue.theta <- rep(0.1, npersons)
-startvalue.beta <- rep(0.1, nitems)
+startvalue.theta <- rep(0.3, npersons)
+startvalue.beta <- rep(0.4, nitems)
 iterations <- 10000
 
 mc <- rasch.gs(startvalue.theta, startvalue.beta, iterations, X, nitems, npersons)
