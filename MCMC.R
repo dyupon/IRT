@@ -49,7 +49,7 @@ acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
     diff.proposal <- outer(chain.beta, proposal, function(x, y) {x - y})
     lgP.proposal <- log(P.proposal)
     cond.prob.current <- colSums(lgP * X + (diff + lgP)*(1 - X))
-    cond.prob.proposal <- colSums(lgP.proposal * (1 - X) + (diff.proposal + lgP.proposal)*(1 - X))
+    cond.prob.proposal <- colSums(lgP.proposal * X + (diff.proposal + lgP.proposal)*(1 - X))
     ratio <- cond.prob.proposal + theta.prior(val = proposal) - 
                    (cond.prob.current + b.prior(val = chain.beta))
     stopifnot(!any(is.na(ratio)))
@@ -59,7 +59,7 @@ acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
     diff.proposal <- outer(proposal, chain.theta, function(x, y) {x - y})
     lgP.proposal <- log(P.proposal)
     cond.prob.current <- rowSums(lgP * X + (diff + lgP)*(1 - X))
-    cond.prob.proposal <- rowSums(lgP.proposal * (1 - X) + (diff.proposal + lgP.proposal)*(1 - X))
+    cond.prob.proposal <- rowSums(lgP.proposal * X + (diff.proposal + lgP.proposal)*(1 - X))
     ratio <- cond.prob.proposal + b.prior(val = proposal) -
       (cond.prob.current + b.prior(val = chain.beta))
   }
