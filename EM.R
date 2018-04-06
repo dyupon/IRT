@@ -32,7 +32,7 @@ betas.s <- rep(0.5, nitems)
 
 #UITLS
 probability <- function(beta, theta) {
-  return(1 / (1 + exp(theta - beta)))
+  return(1 / (1 + exp(beta - theta)))
 }
 
 log.likelihood <- function(x) { # equation 16
