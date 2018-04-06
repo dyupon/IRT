@@ -41,7 +41,7 @@ log.likelihood <- function(x) { # equation 16
   for (j in (1:nitems)) {
     bet.k <- rep(0, ndiscrete) 
     for (k in (1:ndiscrete)) {
-      bet.k <- r[j,k]*log(P)[j,k] + (n[k] - r[j,k])*log(1 - P)[j,k]
+      bet.k[k] <- r[j,k]*log(P)[j,k] + (n[k] - r[j,k])*log(1 - P)[j,k]
     }
     bet[j] <- sum(bet.k)
   }
@@ -85,13 +85,13 @@ while (abs(old.likelihood - new.likelihood) > eps) {
   betas.s <- opt$par
   old.likelihood <- new.likelihood
   new.likelihood <- opt$value
-  # if (iter_count %% 10 == 0) {
+   if (iter_count %% 10 == 0) {
     print("iteration")
     print(iter_count)
     print(betas.s)
     print(thetas.s)
     print(new.likelihood)
-  #}
+  }
 }
 ggplot(as.data.frame(betas.s), aes(betas.s)) + stat_ecdf(geom = "step")
 ggplot(as.data.frame(thetas.s), aes(thetas.s)) + stat_ecdf(geom = "step")
