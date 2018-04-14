@@ -4,23 +4,26 @@ library(matrixStats)
 set.seed(62)
 
 sim.rasch <- function(persons, items){
+  schwierig <- items
   n.items <- length(items)
+  faehig <- persons
   n.persons <- length(persons)
-  fsmat <- outer(persons, items, "-")
+  fsmat <- outer(faehig, schwierig, "-")
   psolve <- exp(fsmat)/(1 + exp(fsmat))
   R <- (matrix(runif(n.items*n.persons),n.persons,n.items) < psolve)*1
   R
 }
 
 npersons <- 100
-nitems <- 20
+nitems <- 10
 items <- rnorm(nitems, 0, 1)
-persons <- rnorm(npersons)
+persons <- rnorm((npersons/2), -5, 1)
+persons <- c(persons, rnorm((npersons/2), 5, 1))
 rmdata <- sim.rasch(persons, items)
 X <- t(rmdata)
 
 probability <- function(beta, theta) {
-  return(1 / (1 + exp(beta - theta)))
+  1 / (1 + exp(beta - theta))
 }
 
 theta.prior <- function(mean = 0, sd = 1, val){
@@ -51,7 +54,7 @@ acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
     cond.prob.current <- colSums(lgP * X + (diff + lgP)*(1 - X))
     cond.prob.proposal <- colSums(lgP.proposal * X + (diff.proposal + lgP.proposal)*(1 - X))
     ratio <- cond.prob.proposal + theta.prior(val = proposal) - 
-                   (cond.prob.current + b.prior(val = chain.beta))
+      (cond.prob.current + theta.prior(val = chain.theta))
     stopifnot(!any(is.na(ratio)))
   } else {
     n <- nitems
@@ -65,7 +68,6 @@ acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
   }
   return(pmin(ratio, rep(0,n)))
 }
-
 
 #GS alg
 rasch.gs <- function(startvalue.theta, startvalue.beta, iterations, data, nitems, npersons) {
@@ -94,11 +96,15 @@ rasch.gs <- function(startvalue.theta, startvalue.beta, iterations, data, nitems
   return(list)
 }
 
-startvalue.theta <- rep(0.3, npersons)
-startvalue.beta <- rep(0.4, nitems)
+startvalue.theta <- rep(0.1, npersons)
+startvalue.beta <- rep(0.1, nitems)
 iterations <- 10000
 
 mc <- rasch.gs(startvalue.theta, startvalue.beta, iterations, X, nitems, npersons)
+print("fitdistr theta_1 ... theta_N/2 at the last chain state to normal")
+fitdistr(mc$chain.theta[iterations,1:(npersons/2)], "normal")
+print("fitdistr theta_(N/2 + 1) ... theta_N at the last chain state to normal")
+fitdistr(mc$chain.theta[iterations,((npersons/2)+1):npersons], "normal")
 fitdistr(mc$chain.theta[iterations,], "normal")
 fitdistr(mc$chain.beta[iterations,], "normal")
 hist(mc$chain.theta[, 1],nclass = 30, main = "Posterior of theta_1")
