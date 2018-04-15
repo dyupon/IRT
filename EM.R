@@ -93,14 +93,17 @@ EM <- function(betas.s, thetas.s, discrete.space, npersons, nitems, ndiscrete, Y
   new.likelihood <- 0
   iter_count <- 0
   # E STEP  
-  while (abs(old.likelihood - new.likelihood) > eps) {
-    iter_count <- iter_count + 1
+  for (iter_count in 1:10000) {
     persons.s <- sampleDist(npersons, thetas.s)
     Y.s <- t(rasch.modelling(persons.s, betas.s))
     n <- sapply(discrete.space,  function(x) sum(persons.s == x))
-    r <- sapply(discrete.space, function(x) rowSums(Y.s[,which(persons.s == x)]))
-
-  
+    r <- sapply(discrete.space, function(x)  {
+      if (length(which(persons.s == x)) == 1) {
+        Y.s[, which(persons.s == x)]
+      } else {
+        rowSums(Y.s[, which(persons.s == x)])
+        }
+      })
     # M STEP
     thetas.s <- n/npersons
     opt <- optim(betas.s, 
