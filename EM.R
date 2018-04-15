@@ -48,11 +48,11 @@ nitems <- 20
 ndiscrete <- 2
 discrete.space <- c(2, 5) 
 prob <- c(0.4, 0.6)
-sampleDist = function(n, discrete.space) { 
-  sample(x = discrete.space, n, replace = T, prob = c(0.4, 0.6))
+sampleDist = function(n, prob) { 
+  sample(x = discrete.space, n, replace = T, prob)
 } 
 
-persons <- sampleDist(npersons, discrete.space)
+persons <- sampleDist(npersons, prob)
 items <- rnorm(nitems, mean = 3, sd = 1)
 rmdata <- rasch.modelling(persons, items)
 Y <- t(rmdata)
@@ -97,8 +97,8 @@ EM <- function(betas.s, thetas.s, discrete.space, npersons, nitems, ndiscrete, Y
     iter_count <- iter_count + 1
     persons.s <- sampleDist(npersons, thetas.s)
     Y.s <- t(rasch.modelling(persons.s, betas.s))
-    n <- sapply(thetas.s,  function(x) sum(persons.s == x))
-    r <- sapply(thetas.s, function(x) rowSums(Y.s[,which(persons.s == x)]))
+    n <- sapply(discrete.space,  function(x) sum(persons.s == x))
+    r <- sapply(discrete.space, function(x) rowSums(Y.s[,which(persons.s == x)]))
 
   
     # M STEP
@@ -121,11 +121,11 @@ EM <- function(betas.s, thetas.s, discrete.space, npersons, nitems, ndiscrete, Y
       print(thetas.s)
       print(new.likelihood)
     #}
-      p1 <- ggplot(as.data.frame(cumsum(thetas.s)), aes(cumsum(thetas.s))) + stat_ecdf(geom = "step")
-      p2 <- ggplot(as.data.frame(cumsum(prob)), aes(cumsum(prob))) + stat_ecdf(geom = "step")
-      p3 <- ggplot(as.data.frame(betas.s), aes(betas.s)) + geom_density()
-      p4 <- ggplot(as.data.frame(items), aes(items)) + geom_density()
-      arrange(p1,p2,p3,p4, ncol = 2)
+      # p1 <- ggplot(as.data.frame(cumsum(thetas.s)), aes(cumsum(thetas.s))) + stat_ecdf(geom = "step")
+      # p2 <- ggplot(as.data.frame(cumsum(prob)), aes(cumsum(prob))) + stat_ecdf(geom = "step")
+      # p3 <- ggplot(as.data.frame(betas.s), aes(betas.s)) + geom_density()
+      # p4 <- ggplot(as.data.frame(items), aes(items)) + geom_density()
+      # arrange(p1,p2,p3,p4, ncol = 2)
   }
   "amount of iterations done:"
   iter_count
