@@ -15,10 +15,9 @@ sim.rasch <- function(persons, items){
 }
 
 npersons <- 100
-nitems <- 10
+nitems <- 20
 items <- rnorm(nitems, 0, 1)
-persons <- rnorm((npersons/2), -5, 1)
-persons <- c(persons, rnorm((npersons/2), 5, 1))
+persons <- rnorm(npersons, 5, 1)
 rmdata <- sim.rasch(persons, items)
 X <- t(rmdata)
 
@@ -35,11 +34,11 @@ b.prior <- function(mean = 0, sd = 1, val){
 } 
 
 prop.theta <- function(current){
-  rnorm(n = current, current, sd = 1)
+  current + rt(n = current, df = 2)
 }
 
 prop.beta <- function(current){
-  rnorm(n = current, current, sd = 1)
+  runif(n = current, current - 10, current + 10)
 }
 
 acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
@@ -101,22 +100,24 @@ startvalue.beta <- rep(0.1, nitems)
 iterations <- 10000
 
 mc <- rasch.gs(startvalue.theta, startvalue.beta, iterations, X, nitems, npersons)
-print("fitdistr theta_1 ... theta_N/2 at the last chain state to normal")
-fitdistr(mc$chain.theta[iterations,1:(npersons/2)], "normal")
-print("fitdistr theta_(N/2 + 1) ... theta_N at the last chain state to normal")
-fitdistr(mc$chain.theta[iterations,((npersons/2)+1):npersons], "normal")
+print("fitdistr theta_1 ... theta_N at the last chain state to normal")
 fitdistr(mc$chain.theta[iterations,], "normal")
+print("fitdistr beta_1 ... beta_J at the last chain state to normal")
 fitdistr(mc$chain.beta[iterations,], "normal")
 hist(mc$chain.theta[, 1],nclass = 30, main = "Posterior of theta_1")
 abline(v = mean(mc$chain.theta[,1]), col = "red")
 abline(v = 0, col = "green")
+plot(as.vector(mc$chain.theta[,1]), type = "l", main = "Chain values of theta_1" )
 hist(mc$chain.beta[,1],nclass = 30, main = "Posterior of beta_1")
 abline(v = mean(mc$chain.beta[,1]), col = "red")
 abline(v = 0, col = "green")
-plot(as.vector(mc$chain.theta[,1]), type = "l", main = "Chain values of theta_1" )
 plot(as.vector(mc$chain.beta[,1]), type = "l",  main = "Chain values of beta_1" )
 hist(mc$chain.theta[, 50],nclass = 30, main = "Posterior of theta_50")
 abline(v = mean(mc$chain.theta[,50]), col = "red")
 abline(v = 0, col = "green")
 plot(as.vector(mc$chain.theta[,50]), type = "l", main = "Chain values of theta_50" )
 abline(v = 0, col = "green")
+hist(mc$chain.beta[,20],nclass = 30, main = "Posterior of beta_20")
+abline(v = mean(mc$chain.beta[,20]), col = "red")
+abline(v = 0, col = "green")
+plot(as.vector(mc$chain.beta[,20]), type = "l",  main = "Chain values of beta_20" )
