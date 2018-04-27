@@ -69,7 +69,7 @@ probability <- function(beta, theta) {
 }
 
 regularized.log.likelihood <- function(x, n, r, iter_count) { # equation 16
-  k <- 0.4
+  kk <- 0.4
   lambda <- 1
   P <- outer(x, discrete.space, probability)
   bet <- rep(0, nitems) 
@@ -80,7 +80,7 @@ regularized.log.likelihood <- function(x, n, r, iter_count) { # equation 16
     }
     bet[j] <- sum(bet.k) 
   }
-  res <- sum(bet) - lambda*k^iter_count*(sum(x^2))
+  res <- sum(bet) - lambda*kk^iter_count*(sum(x^2))
   #res <- sum(bet) - lambda*k^iter_count*(1/nitems)*sum(dnorm(x, log = T)*dnorm(x))
   return(res)
 }
@@ -101,8 +101,9 @@ EM <- function(betas.s, thetas.s, discrete.space, npersons, nitems, ndiscrete, Y
   new.likelihood <- 0
   iter_count <- 0
   # E STEP  
-  for (iter_count in (1:1000)) {
-    persons.s <- sampleDist(npersons, thetas.s)
+  while (abs(new.likelihood - old.likelihood) > eps) {
+    iter_count <- iter_count + 1
+    persons.s <- prob
     Y.s <- t(rasch.modelling(persons.s, betas.s))
     n <- sapply(discrete.space,  function(x) sum(persons.s == x))
     r <- sapply(discrete.space, function(x)  {
