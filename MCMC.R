@@ -1,6 +1,10 @@
 library(ggplot2)
 library(MCMCpack)
 library(matrixStats)
+library(beepr)
+library(tidyr)
+library(dplyr)
+library(latex2exp)
 set.seed(62)
 
 sim.rasch <- function(persons, items){
@@ -14,31 +18,25 @@ sim.rasch <- function(persons, items){
   R
 }
 
-npersons <- 100
-nitems <- 20
-items <- rnorm(nitems, 0, 1)
-persons <- rnorm(npersons, 5, 1)
-rmdata <- sim.rasch(persons, items)
-X <- t(rmdata)
 
 probability <- function(beta, theta) {
   1 / (1 + exp(beta - theta))
 }
 
-theta.prior <- function(mean = 0, sd = 1, val){
+theta.prior <- function(mean = 0, sd = 5, val){
   dnorm(x = val, mean, sd, log = T) 
 }
 
 b.prior <- function(mean = 0, sd = 1, val){
-  dnorm(x = val, mean, sd, log = T)
+  dnorm(x = val, mean, 1, log = T)
 } 
 
 prop.theta <- function(current){
-  current + rt(n = current, df = 2)
+  rnorm(n = current, current, sd = 5)
 }
 
 prop.beta <- function(current){
-  runif(n = current, current - 10, current + 10)
+  rnorm(n = current, current, sd = 1)
 }
 
 acceptance <- function(proposal, chain.theta, chain.beta, X, mode) {
@@ -95,29 +93,193 @@ rasch.gs <- function(startvalue.theta, startvalue.beta, iterations, data, nitems
   return(list)
 }
 
+npersons <- 1000
+nitems <- 40
 startvalue.theta <- rep(0.1, npersons)
 startvalue.beta <- rep(0.1, nitems)
-iterations <- 10000
-
+iterations <- 30000
+trueMeanItems <- 0
+trueMeanPersons <- 3
+items <- rnorm(nitems, trueMeanItems, 1)
+persons <- rnorm(npersons,trueMeanPersons, 1)
+rmdata <- sim.rasch(persons, items)
+X <- t(rmdata)
 mc <- rasch.gs(startvalue.theta, startvalue.beta, iterations, X, nitems, npersons)
+
+df.theta <- as.data.frame(mc$chain.theta)
+colnames(df.theta)[1] <- "theta1"
+colnames(df.theta)[npersons] <- paste0("theta", npersons)
+last.state.theta <- as.data.frame(t(df.theta[iterations + 1,]))
+colnames(last.state.theta) <- "last.state"
+df.theta %>% gather("theta", "value", c(theta1, paste0("theta", npersons))) %>% select(theta, value) -> posterior
+posterior %>% group_by(theta) %>% summarize(group.mean = mean(value)) -> mean.posterior
+chain.val.theta <- cbind.data.frame(mc$chain.theta[,1], mc$chain.theta[,(npersons/2)], mc$chain.theta[,npersons])
+colnames(chain.val.theta) <- c("theta1", paste0("theta", npersons/2), paste0("theta", npersons))
+chain.val.theta %>% mutate(index = as.numeric(row.names(chain.val.theta))) -> chain.val.theta
+
+
+df.beta <- as.data.frame(mc$chain.beta)
+colnames(df.beta)[1] <- "beta1"
+colnames(df.beta)[nitems] <- paste0("beta", nitems)
+last.state.beta <- as.data.frame(t(df.beta[iterations + 1,]))
+colnames(last.state.beta) <- "last.state"
+df.beta %>% gather("beta", "value", c(beta1, paste0("beta", nitems))) %>% select(beta, value) -> posterior.beta
+posterior.beta %>% group_by(beta) %>% summarize(group.mean = mean(value)) -> mean.posterior.beta
+chain.val.beta <- cbind.data.frame(mc$chain.beta[,1], mc$chain.beta[,(nitems/2)], mc$chain.beta[,nitems])
+colnames(chain.val.beta) <- c("beta1", paste0("beta", nitems/2), paste0("beta", nitems))
+chain.val.beta %>% mutate(index = as.numeric(row.names(chain.val.beta))) -> chain.val.beta
+
+p1 <- ggplot(data = last.state.theta, aes(x = last.state)) +
+  geom_histogram(aes(x = last.state), binwidth = 0.1, color = "red",position = "identity", alpha = 0.1) +
+  geom_vline(aes(xintercept = mean(last.state)),
+             color = "red", linetype = "dashed", size = 1) +
+  labs(title = TeX("Posterior of $\\theta = (\\theta_{1}, ..., \\theta_{N})$ at the last state of chain"), y = "Frequency", x = "Value") +
+  geom_vline(aes(xintercept = trueMeanPersons),
+             color = "green", linetype = "dashed", size = 1) 
+
 print("fitdistr theta_1 ... theta_N at the last chain state to normal")
 fitdistr(mc$chain.theta[iterations,], "normal")
+
+p2 <- ggplot(data = posterior, aes(x = value, fill = theta, color = theta)) +
+  geom_histogram(aes(x = value), binwidth = 0.1,position = "identity", alpha = 0.1) +
+  geom_vline(x = mean.posterior, aes(xintercept = mean.posterior[1,2]),
+             color = "red", linetype = "dashed", size = 1) +
+  geom_vline(x = mean.posterior, aes(xintercept = mean.posterior[2,2]),
+             color = "blue", linetype = "dashed", size = 1) +
+  labs(title = TeX("Trajectories of $\\theta_{1}$ and $\\theta_{1000}$"),y = "Frequency", x = "Value") +
+  theme(legend.title = element_blank())
+
+p3 <- ggplot(data = chain.val.theta, aes(x = index, y = theta1)) + geom_line() +
+  labs(title = TeX("Chain values of $\\theta_{1}$"), x = "The number of chain state", y = "Value")
+p4 <- ggplot(data = chain.val.theta, aes(x = index, y = theta500)) + geom_line() +
+  labs(title = TeX("Chain values of $\\theta_{500}$"), x = "The number of chain state", y = "Value")
+p5 <- ggplot(data = chain.val.theta, aes(x = index, y = theta1000)) + geom_line() +
+  labs(title = TeX("Chain values of $\\theta_{1000}$"), x = "The number of chain state", y = "Value")
+
+
+p6 <- ggplot(data = last.state.beta, aes(x = last.state)) +
+  geom_histogram(aes(x = last.state), binwidth = 0.1, color = "red",position = "identity", alpha = 0.1) +
+  geom_vline(aes(xintercept = mean(last.state)),
+             color = "red", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = trueMeanItems),
+             color = "green", linetype = "dashed", size = 1) +
+  labs(title = TeX("Posterior of $\\beta = (\\beta_{1}, ..., \\beta_{J})$ at the last state of chain"), y = "Frequency", x = "Last state")
 print("fitdistr beta_1 ... beta_J at the last chain state to normal")
 fitdistr(mc$chain.beta[iterations,], "normal")
-hist(mc$chain.theta[, 1],nclass = 30, main = "Posterior of theta_1")
-abline(v = mean(mc$chain.theta[,1]), col = "red")
-abline(v = 0, col = "green")
-plot(as.vector(mc$chain.theta[,1]), type = "l", main = "Chain values of theta_1" )
-hist(mc$chain.beta[,1],nclass = 30, main = "Posterior of beta_1")
-abline(v = mean(mc$chain.beta[,1]), col = "red")
-abline(v = 0, col = "green")
-plot(as.vector(mc$chain.beta[,1]), type = "l",  main = "Chain values of beta_1" )
-hist(mc$chain.theta[, 50],nclass = 30, main = "Posterior of theta_50")
-abline(v = mean(mc$chain.theta[,50]), col = "red")
-abline(v = 0, col = "green")
-plot(as.vector(mc$chain.theta[,50]), type = "l", main = "Chain values of theta_50" )
-abline(v = 0, col = "green")
-hist(mc$chain.beta[,20],nclass = 30, main = "Posterior of beta_20")
-abline(v = mean(mc$chain.beta[,20]), col = "red")
-abline(v = 0, col = "green")
-plot(as.vector(mc$chain.beta[,20]), type = "l",  main = "Chain values of beta_20" )
+p7 <- ggplot(data = posterior.beta, aes(x = value, fill = beta, color = beta)) +
+  geom_histogram(aes(x = value), binwidth = 0.1,position = "identity", alpha = 0.1) +
+  geom_vline(x = mean.posterior.beta, aes(xintercept = mean.posterior.beta[1,2]),
+             color = "red", linetype = "dashed", size = 1) +
+  geom_vline(x = mean.posterior.beta, aes(xintercept = mean.posterior.beta[2,2]),
+             color = "blue", linetype = "dashed", size = 1) +
+  labs(title = TeX("Trajectories of $\\beta_{1}$ and $\\beta_{40}$"), y = "Frequency", x = "Value") +
+  theme(legend.title = element_blank())
+
+p8 <- ggplot(data = chain.val.beta, aes(x = index, y = beta1)) + geom_line() +
+  labs(title = TeX("Chain values of $\\beta_{1}$"), x = "The number of chain state", y = "Value")
+p9 <- ggplot(data = chain.val.beta, aes(x = index, y = beta20)) + geom_line() +
+  labs(title = TeX("Chain values of $\\beta_{20}$"), x = "The number of chain state", y = "Value")
+p10 <- ggplot(title = TeX("Chain values of $\\beta_{40}$"), data = chain.val.beta, aes(x = index, y = beta40)) + geom_line() +
+  labs(title = TeX("Chain values of $\\beta_{40}$"), x = "The number of chain state", y = "Value")
+
+lags <- seq(0, 100, 1)
+autocorr.theta <- cbind.data.frame(autocorr(mc$chain.theta[,1], lags = lags), 
+                                   autocorr(mc$chain.theta[,npersons/2], lags = lags),
+                                   autocorr(mc$chain.theta[,npersons], lags = lags))
+colnames(autocorr.theta) <- c("theta1", paste0("theta", npersons/2), paste0("theta", npersons))
+autocorr.theta %>% mutate(index = lags) -> autocorr.theta
+autocorr.theta  %>% gather("theta", "value", 1:(dim(autocorr.theta)[2] - 1)) -> autocorr.theta
+p11 <- ggplot(data = autocorr.theta, aes(x = index, y = value, color = theta)) + 
+  geom_line() + 
+  geom_point() +
+  geom_abline(aes(slope = 0, intercept = 0)) +
+  theme(legend.title = element_blank()) +
+  labs(title = TeX("Autocorrelation function for chain $\\theta_{1}, \\theta_{500}, \\theta_{1000}$"), y = "Autocorrelation", x = "Lags")
+
+autocorr.beta <- cbind.data.frame(autocorr(mc$chain.beta[,1], lags = lags), 
+                                   autocorr(mc$chain.beta[,nitems/2], lags = lags),
+                                   autocorr(mc$chain.beta[,nitems], lags = lags))
+colnames(autocorr.beta) <- c("beta1", paste0("beta", nitems/2), paste0("beta", nitems))
+autocorr.beta %>% mutate(index = lags) -> autocorr.beta
+autocorr.beta  %>% gather("beta", "value", 1:(dim(autocorr.beta)[2] - 1)) -> autocorr.beta
+p13 <- ggplot(data = autocorr.beta, aes(x = index, y = value, color = beta)) + 
+  geom_line() + 
+  geom_point() +
+  geom_abline(aes(slope = 0, intercept = 0)) +
+  theme(legend.title = element_blank()) +
+  labs(title = TeX("Autocorrelation function for chain $\\beta_{1}, \\beta_{20}, \\beta_{40}$"), y = "Autocorrelation", x = "Lags")
+
+p1 
+p2
+p3
+p4
+p5
+p6
+p7
+p8
+p9
+p10
+p11
+p13
+
+iterations <- 50000
+items <- rnorm(nitems, trueMeanItems, 1)
+persons <- c(rnorm(npersons/2, -3, 1), rnorm(npersons/2, 3, 1))
+rmdata <- sim.rasch(persons, items)
+X <- t(rmdata)
+mc1 <- rasch.gs(startvalue.theta, startvalue.beta, iterations, X, nitems, npersons)
+
+df.theta.1 <- as.data.frame(mc1$chain.theta)
+colnames(df.theta.1)[1] <- "theta1"
+colnames(df.theta.1)[npersons] <- paste0("theta", npersons)
+last.state.theta.1 <- as.data.frame(t(df.theta.1[iterations + 1,]))
+colnames(last.state.theta.1) <- "last.state"
+df.theta.1 %>% gather("theta", "value", c(theta1, paste0("theta", npersons))) %>% select(theta, value) -> posterior.1
+
+posterior.1 %>% group_by(theta) %>% summarize(group.mean = mean(value)) -> mean.posterior.1
+chain.val.theta.1 <- cbind.data.frame(mc1$chain.theta[,1], mc1$chain.theta[,(npersons/2)], mc1$chain.theta[,npersons])
+colnames(chain.val.theta.1) <- c("theta1", paste0("theta", npersons/2), paste0("theta", npersons))
+chain.val.theta.1 %>% mutate(index = as.numeric(row.names(chain.val.theta.1))) -> chain.val.theta.1
+
+ggplot(data = last.state.theta.1, aes(x = last.state)) +
+  geom_histogram(aes(x = last.state), binwidth = 0.1, color = "red",position = "identity", alpha = 0.1) +
+  labs(title = TeX("Posterior of $\\theta = (\\theta_{1}, ..., \\theta_{N})$ at the last state of chain"), y = "Frequency", x = "Value") +
+  geom_vline(aes(xintercept = trueMeanPersons),
+             color = "green", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = -trueMeanPersons),
+             color = "green", linetype = "dashed", size = 1) 
+
+
+ggplot(data = posterior.1, aes(x = value, fill = theta, color = theta)) +
+  geom_histogram(aes(x = value), binwidth = 0.1,position = "identity", alpha = 0.1) +
+  geom_vline(x = mean.posterior.1, aes(xintercept = mean.posterior.1[1,2]),
+             color = "red", linetype = "dashed", size = 1) +
+  geom_vline(x = mean.posterior.1, aes(xintercept = mean.posterior.1[2,2]),
+             color = "blue", linetype = "dashed", size = 1) +
+  labs(title = TeX("Trajectories of $\\theta_{1}$ and $\\theta_{1000}$"),y = "Frequency", x = "Value") +
+  theme(legend.title = element_blank())
+
+ggplot(data = chain.val.theta.1, aes(x = index, y = theta1)) + geom_line() +
+  labs(title = TeX("Chain values of $\\theta_{1}$"), x = "The number of chain state", y = "Value")
+ggplot(data = chain.val.theta.1, aes(x = index, y = theta500)) + geom_line() +
+  labs(title = TeX("Chain values of $\\theta_{500}$"), x = "The number of chain state", y = "Value")
+ggplot(data = chain.val.theta.1, aes(x = index, y = theta1000)) + geom_line() +
+  labs(title = TeX("Chain values of $\\theta_{1000}$"), x = "The number of chain state", y = "Value")
+
+lags <- seq(0, 100, 1)
+autocorr.theta.1 <- cbind.data.frame(autocorr(mc1$chain.theta[,1], lags = lags), 
+                                   autocorr(mc1$chain.theta[,npersons/2], lags = lags),
+                                   autocorr(mc1$chain.theta[,npersons], lags = lags))
+colnames(autocorr.theta.1) <- c("theta1", paste0("theta", npersons/2), paste0("theta", npersons))
+autocorr.theta.1 %>% mutate(index = lags) -> autocorr.theta.1
+autocorr.theta.1  %>% gather("theta", "value", 1:(dim(autocorr.theta.1)[2] - 1)) -> autocorr.theta.1
+
+ggplot(data = autocorr.theta.1, aes(x = index, y = value, color = theta)) + 
+  geom_line() + 
+  geom_point() +
+  geom_abline(aes(slope = 0, intercept = 0)) +
+  theme(legend.title = element_blank()) +
+  labs(title = TeX("Autocorrelation function for chain $\\theta_{1}, \\theta_{500}, \\theta_{1000}$"), y = "Autocorrelation", x = "Lags")
+
+fitdistr(mc1$chain.theta[iterations,1:npersons/2], "normal")
+fitdistr(mc1$chain.theta[iterations,(npersons/2):npersons], "normal")
